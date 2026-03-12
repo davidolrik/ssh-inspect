@@ -1,0 +1,3 @@
+/dist
+/ssh-inspect
+*.local.toml

@@ -1,0 +1,35 @@
+[tools]
+go = "1.26.1"
+prek = "latest"
+
+[hooks]
+postinstall = ["git config --unset-all core.hooksPath || true", "rm -f .git/hooks/pre-commit*", "prek install"]
+
+[tasks.help]
+description = "📚 Help"
+alias = "default"
+run = '''# mise tasks --local
+    echo "         _          _                           _   "
+    echo " ___ ___| |__      (_)_ __  ___ _ __   ___  ___| |_ "
+    echo "/ __/ __| '_ \ ____| | '_ \/ __| '_ \ / _ \/ __| __|"
+    echo "\__ \__ \ | | |____| | | | \__ \ |_) |  __/ (__| |_ "
+    echo "|___/___/_| |_|    |_|_| |_|___/ .__/ \___|\___|\__|"
+    echo "                               |_|                  "
+    mise tasks --local
+'''
+
+[tasks.build]
+description = "🛠️  Build binary"
+run = ["go mod tidy", "go build -o ssh-inspect ."]
+
+[tasks."build:snapshot"]
+description = "🧪 Build snapshot"
+run = ["goreleaser build --snapshot --clean"]
+
+[tasks."docs:server"]
+description = "🚀 Run documentation server"
+run = ["npm run docs:dev"]
+
+[tasks."github:publish"]
+description = "📦 Publish to GitHub"
+run = ["git push", "git push --tags"]
