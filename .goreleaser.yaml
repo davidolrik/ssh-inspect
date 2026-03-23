@@ -7,9 +7,9 @@ before:
   hooks:
     - go mod tidy
     - mkdir -p completions
-    - go run . completion bash > completions/ssh-inspect.bash
-    - go run . completion zsh > completions/ssh-inspect.zsh
-    - go run . completion fish > completions/ssh-inspect.fish
+    - sh -c 'go run . completion bash > completions/ssh-inspect.bash'
+    - sh -c 'go run . completion zsh > completions/ssh-inspect.zsh'
+    - sh -c 'go run . completion fish > completions/ssh-inspect.fish'
 
 builds:
   - binary: ssh-inspect
@@ -42,7 +42,8 @@ homebrew_casks:
 archives:
   - formats: [tar.gz]
     files:
-      - completions/*
+      - src: "./completions/*"
+        dst: completions
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
