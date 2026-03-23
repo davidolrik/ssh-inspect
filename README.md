@@ -4,6 +4,12 @@ Shows the SSH configuration that applies to a given hostname, separating global 
 
 ## Install
 
+### Homebrew
+
+```sh
+brew install davidolrik/tap/ssh-inspect
+```
+
 ### mise
 
 ```sh

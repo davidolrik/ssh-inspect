@@ -19,6 +19,19 @@ builds:
       - amd64
       - arm64
 
+brews:
+  - repository:
+      owner: davidolrik
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/davidolrik/ssh-inspect
+    description: Show SSH configuration for a hostname
+    license: MIT
+    install: |
+      bin.install "ssh-inspect"
+
+      generate_completions_from_executable(bin/"ssh-inspect", "completion")
+
 archives:
   - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.
