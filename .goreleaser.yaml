@@ -12,7 +12,9 @@ before:
     - sh -c 'go run . completion fish > completions/ssh-inspect.fish'
 
 builds:
-  - binary: ssh-inspect
+  # Linux builds - CGO disabled for static linking
+  - id: linux
+    binary: ssh-inspect
     main: .
     env:
       - CGO_ENABLED=0
@@ -20,10 +22,42 @@ builds:
       - -s -w -X ssh-inspect/cmd.Version={{.Version}}
     goos:
       - linux
-      - darwin
     goarch:
       - amd64
       - arm64
+
+  # macOS builds - separate per arch for code signing and notarization
+  - id: darwin-amd64
+    binary: ssh-inspect
+    main: .
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X ssh-inspect/cmd.Version={{.Version}}
+    goos:
+      - darwin
+    goarch:
+      - amd64
+    hooks:
+      post:
+        - sh -c 'if [ -n "$CODESIGN_IDENTITY" ]; then codesign --sign "$CODESIGN_IDENTITY" --options runtime --entitlements entitlements.plist --timestamp --force --verbose "{{ .Path }}"; else echo "Skipping code signing (CODESIGN_IDENTITY not set)"; fi'
+        - sh -c 'if [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then echo "Notarizing {{ .Path }}..."; ditto -c -k --keepParent "{{ .Path }}" "{{ .Path }}.zip" && xcrun notarytool submit "{{ .Path }}.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait && rm "{{ .Path }}.zip" && echo "Notarization complete (stapling skipped for standalone binary)"; else echo "Skipping notarization (credentials not set)"; fi'
+
+  - id: darwin-arm64
+    binary: ssh-inspect
+    main: .
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X ssh-inspect/cmd.Version={{.Version}}
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    hooks:
+      post:
+        - sh -c 'if [ -n "$CODESIGN_IDENTITY" ]; then codesign --sign "$CODESIGN_IDENTITY" --options runtime --entitlements entitlements.plist --timestamp --force --verbose "{{ .Path }}"; else echo "Skipping code signing (CODESIGN_IDENTITY not set)"; fi'
+        - sh -c 'if [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then echo "Notarizing {{ .Path }}..."; ditto -c -k --keepParent "{{ .Path }}" "{{ .Path }}.zip" && xcrun notarytool submit "{{ .Path }}.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait && rm "{{ .Path }}.zip" && echo "Notarization complete (stapling skipped for standalone binary)"; else echo "Skipping notarization (credentials not set)"; fi'
 
 homebrew_casks:
   - repository:
