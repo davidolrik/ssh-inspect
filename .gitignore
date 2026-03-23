@@ -1,3 +1,4 @@
 /dist
 /ssh-inspect
+/completions
 *.local.toml

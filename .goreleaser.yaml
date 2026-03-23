@@ -6,6 +6,10 @@ force_token: github
 before:
   hooks:
     - go mod tidy
+    - mkdir -p completions
+    - go run . completion bash > completions/ssh-inspect.bash
+    - go run . completion zsh > completions/ssh-inspect.zsh
+    - go run . completion fish > completions/ssh-inspect.fish
 
 builds:
   - binary: ssh-inspect
@@ -21,21 +25,24 @@ builds:
       - amd64
       - arm64
 
-brews:
+homebrew_casks:
   - repository:
       owner: davidolrik
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/davidolrik/ssh-inspect
     description: Show SSH configuration for a hostname
-    license: MIT
-    install: |
-      bin.install "ssh-inspect"
-
-      generate_completions_from_executable(bin/"ssh-inspect", "completion")
+    binaries:
+      - ssh-inspect
+    completions:
+      bash: completions/ssh-inspect.bash
+      zsh: completions/ssh-inspect.zsh
+      fish: completions/ssh-inspect.fish
 
 archives:
   - formats: [tar.gz]
+    files:
+      - completions/*
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
