@@ -112,6 +112,8 @@ including Host * and Match all settings, excluding SSH built-in defaults.`,
 		SilenceUsage:      true,
 	}
 
+	rootCmd.AddCommand(versionCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

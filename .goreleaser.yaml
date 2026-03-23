@@ -12,6 +12,8 @@ builds:
     main: .
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X ssh-inspect/cmd.Version={{.Version}}
     goos:
       - linux
       - darwin
