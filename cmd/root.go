@@ -80,7 +80,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Show wildcard settings first — these apply to all hosts.
 	if len(wildcardConfig) > 0 {
-		ssh.PrintConfig("*", wildcardConfig, color, true)
+		ssh.PrintConfig("*", wildcardConfig, color)
 		first = false
 	}
 
@@ -93,7 +93,7 @@ func run(cmd *cobra.Command, args []string) error {
 			fmt.Println()
 		}
 		first = false
-		ssh.PrintConfig(entry.Name, entry.Config, color, false)
+		ssh.PrintConfig(entry.Name, entry.Config, color)
 	}
 
 	return nil

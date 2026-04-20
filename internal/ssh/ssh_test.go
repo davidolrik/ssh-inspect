@@ -122,6 +122,97 @@ func TestRandomHostname(t *testing.T) {
 	}
 }
 
+// TestPrintConfigPriorityOrder verifies that priority keys (including all Identity*
+// options) are printed before other keys when not sorted.
+func TestPrintConfigPriorityOrder(t *testing.T) {
+	cfg := Config{
+		"hostname":       {"myserver.example.com"},
+		"user":           {"deploy"},
+		"port":           {"22"},
+		"identityfile":   {"~/.ssh/deploy_key"},
+		"identityagent":  {"none"},
+		"identitiesonly": {"yes"},
+		"proxyjump":      {"bastion"},
+		"addkeystoagent": {"true"},
+		"controlmaster":  {"auto"},
+	}
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	PrintConfig("myserver", cfg, false)
+
+	w.Close()
+	os.Stdout = old
+
+	buf, _ := io.ReadAll(r)
+	out := string(buf)
+
+	// Priority keys must appear in PriorityKeys order.
+	lastIdx := -1
+	for _, key := range PriorityKeys {
+		displayKey := TitleCaseKey(key)
+		idx := strings.Index(out, displayKey)
+		if idx < 0 {
+			t.Errorf("expected %q in output:\n%s", displayKey, out)
+			continue
+		}
+		if idx < lastIdx {
+			t.Errorf("expected %q after prior priority key in output:\n%s", displayKey, out)
+		}
+		lastIdx = idx
+	}
+
+	// Non-priority keys must appear after all priority keys.
+	for _, key := range []string{"AddKeysToAgent", "ControlMaster"} {
+		idx := strings.Index(out, key)
+		if idx < 0 {
+			t.Errorf("expected %q in output:\n%s", key, out)
+			continue
+		}
+		if idx < lastIdx {
+			t.Errorf("expected non-priority key %q after priority keys in output:\n%s", key, out)
+		}
+	}
+}
+
+// TestPrintConfigWildcardPriorityOrder verifies that priority keys are ordered
+// consistently in the Host * block — e.g. IdentitiesOnly must not sort before
+// IdentityAgent/IdentityFile as pure alphabetical sort would produce.
+func TestPrintConfigWildcardPriorityOrder(t *testing.T) {
+	cfg := Config{
+		"identityagent":  {"~/.1password/agent.sock"},
+		"identityfile":   {"~/.ssh/id_ed25519"},
+		"identitiesonly": {"yes"},
+		"addkeystoagent": {"true"},
+		"controlmaster":  {"auto"},
+	}
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	PrintConfig("*", cfg, false)
+
+	w.Close()
+	os.Stdout = old
+
+	buf, _ := io.ReadAll(r)
+	out := string(buf)
+
+	agentIdx := strings.Index(out, "IdentityAgent")
+	fileIdx := strings.Index(out, "IdentityFile")
+	onlyIdx := strings.Index(out, "IdentitiesOnly")
+
+	if agentIdx < 0 || fileIdx < 0 || onlyIdx < 0 {
+		t.Fatalf("expected all Identity* keys in output:\n%s", out)
+	}
+	if onlyIdx < agentIdx || onlyIdx < fileIdx {
+		t.Errorf("expected IdentitiesOnly after IdentityAgent and IdentityFile:\n%s", out)
+	}
+}
+
 // TestPrintConfigFiltersHostKey verifies that the "host" metadata key is suppressed
 // from output when its value equals the target hostname.
 func TestPrintConfigFiltersHostKey(t *testing.T) {
@@ -136,7 +227,7 @@ func TestPrintConfigFiltersHostKey(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	PrintConfig("myserver", cfg, false, false)
+	PrintConfig("myserver", cfg, false)
 
 	w.Close()
 	os.Stdout = old

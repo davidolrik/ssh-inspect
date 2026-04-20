@@ -167,14 +167,8 @@ func ParseRawWildcardConfig(config string) Config {
 		// Check for Host/Match section headers.
 		if strings.HasPrefix(lower, "host ") && !strings.HasPrefix(lower, "hostname") {
 			fields := strings.Fields(trimmed)
-			hasBarestar := false
-			for _, f := range fields[1:] {
-				if f == "*" {
-					hasBarestar = true
-					break
-				}
-			}
-			inWildcard = hasBarestar
+			hasBareStar := slices.Contains(fields[1:], "*")
+			inWildcard = hasBareStar
 			continue
 		}
 		if strings.HasPrefix(lower, "match") {
@@ -369,6 +363,7 @@ func IsTerminal() bool {
 var titleCaseOverrides = map[string]string{
 	"identityfile":                     "IdentityFile",
 	"identityagent":                    "IdentityAgent",
+	"identitiesonly":                   "IdentitiesOnly",
 	"certificatefile":                  "CertificateFile",
 	"casignaturealgorithms":            "CASignatureAlgorithms",
 	"hostbasedacceptedalgorithms":      "HostbasedAcceptedAlgorithms",
@@ -470,11 +465,14 @@ func TitleCaseKey(key string) string {
 	return strings.ToUpper(key[:1]) + key[1:]
 }
 
+// PriorityKeys defines the keys that are printed first in host-specific blocks,
+// in the order they should appear. All other keys are printed alphabetically after.
+var PriorityKeys = []string{"hostname", "hostkeyalias", "user", "port", "identityagent", "identityfile", "identitiesonly", "proxyjump"}
+
 // PrintConfig writes the diff result as a valid SSH config block.
-// When color is true, ANSI highlighting is applied. When sorted is true,
-// keys are printed in pure alphabetical order; otherwise priority keys
-// (hostname, user, port, identityfile, proxyjump) are printed first.
-func PrintConfig(hostname string, cfg Config, color, sorted bool) {
+// When color is true, ANSI highlighting is applied. PriorityKeys are printed
+// first in their defined order; remaining keys follow in alphabetical order.
+func PrintConfig(hostname string, cfg Config, color bool) {
 	if len(cfg) == 0 {
 		return
 	}
@@ -511,13 +509,10 @@ func PrintConfig(hostname string, cfg Config, color, sorted bool) {
 		printed[key] = true
 	}
 
-	// When not sorted, print common keys first for readability.
-	if !sorted {
-		priorityKeys := []string{"hostname", "user", "port", "identityfile", "proxyjump"}
-		for _, key := range priorityKeys {
-			if vals, ok := cfg[key]; ok {
-				printKey(key, vals)
-			}
+	// Print priority keys first for readability.
+	for _, key := range PriorityKeys {
+		if vals, ok := cfg[key]; ok {
+			printKey(key, vals)
 		}
 	}
 
