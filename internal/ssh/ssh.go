@@ -314,6 +314,69 @@ func ParseJumpHosts(value string) []string {
 	return hosts
 }
 
+// sshFlagsWithValue is the set of ssh(1) short flags that take a separate argument.
+// Used by ParseProxyCommand to skip over flag values when locating the hostname.
+var sshFlagsWithValue = map[string]bool{
+	"-B": true, "-b": true, "-c": true, "-D": true, "-E": true, "-e": true,
+	"-F": true, "-I": true, "-i": true, "-J": true, "-L": true, "-l": true,
+	"-m": true, "-O": true, "-o": true, "-P": true, "-p": true, "-Q": true,
+	"-R": true, "-S": true, "-W": true, "-w": true,
+}
+
+// ParseProxyCommand extracts the SSH hop hostname from a ProxyCommand value,
+// but only when the command is the canonical `ssh [opts] host -W %h:%p` form
+// (equivalent to ProxyJump). Any other form (nc, corkscrew, cloudflared, aws
+// ssm, kubectl, ...) returns "" since those don't route through an SSH host
+// we can recursively inspect.
+func ParseProxyCommand(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "none" {
+		return ""
+	}
+
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return ""
+	}
+
+	// First field must be the ssh binary (bare or absolute path).
+	if filepath.Base(fields[0]) != "ssh" {
+		return ""
+	}
+
+	// The command must contain -W to be a stdio-forwarding SSH hop.
+	hasW := false
+	for _, f := range fields[1:] {
+		if f == "-W" {
+			hasW = true
+			break
+		}
+	}
+	if !hasW {
+		return ""
+	}
+
+	// Walk args, skipping flags and their values; the first bare positional
+	// token is the destination host.
+	args := fields[1:]
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if sshFlagsWithValue[a] {
+			i++ // skip the flag's value
+			continue
+		}
+		if strings.HasPrefix(a, "-") {
+			continue // bare flag like -q, -A, -4
+		}
+		// First non-flag token is the host.
+		if j := strings.LastIndex(a, "@"); j >= 0 {
+			a = a[j+1:]
+		}
+		return a
+	}
+	return ""
+}
+
 // ResolveChain returns the target host followed by each host in its ProxyJump
 // chain, recursively. visited prevents cycles. The target is always first
 // (closest to the intended destination); proxies follow in hop order.
@@ -334,6 +397,14 @@ func ResolveChain(hostname string, defaults Config, visited map[string]bool) ([]
 	if jumpVals, ok := cfg["proxyjump"]; ok && len(jumpVals) > 0 {
 		for _, jumpHost := range ParseJumpHosts(jumpVals[0]) {
 			chain, err := ResolveChain(jumpHost, defaults, visited)
+			if err != nil {
+				return nil, err
+			}
+			entries = append(entries, chain...)
+		}
+	} else if cmdVals, ok := cfg["proxycommand"]; ok && len(cmdVals) > 0 {
+		if proxyHost := ParseProxyCommand(cmdVals[0]); proxyHost != "" {
+			chain, err := ResolveChain(proxyHost, defaults, visited)
 			if err != nil {
 				return nil, err
 			}
@@ -428,6 +499,7 @@ var titleCaseOverrides = map[string]string{
 	"pkcs11provider":                   "PKCS11Provider",
 	"port":                             "Port",
 	"preferredauthentications":         "PreferredAuthentications",
+	"proxycommand":                     "ProxyCommand",
 	"proxyjump":                        "ProxyJump",
 	"proxyusefdpass":                   "ProxyUseFdpass",
 	"remotecommand":                    "RemoteCommand",
@@ -467,7 +539,7 @@ func TitleCaseKey(key string) string {
 
 // PriorityKeys defines the keys that are printed first in host-specific blocks,
 // in the order they should appear. All other keys are printed alphabetically after.
-var PriorityKeys = []string{"hostname", "hostkeyalias", "user", "port", "identityagent", "identityfile", "identitiesonly", "proxyjump"}
+var PriorityKeys = []string{"hostname", "hostkeyalias", "user", "port", "identityagent", "identityfile", "identitiesonly", "proxyjump", "proxycommand"}
 
 // PrintConfig writes the diff result as a valid SSH config block.
 // When color is true, ANSI highlighting is applied. PriorityKeys are printed

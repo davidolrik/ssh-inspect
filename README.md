@@ -54,7 +54,7 @@ Host myserver
     ProxyJump            bastion
 ```
 
-The output is a valid SSH config format. `Host *` options are shown first, followed by host-specific blocks. In both, priority keys (Hostname, User, Port, IdentityAgent, IdentityFile, IdentitiesOnly, ProxyJump) are listed first in that order, with remaining keys sorted alphabetically. If the host uses `ProxyJump`, each hop in the chain gets its own block.
+The output is a valid SSH config format. `Host *` options are shown first, followed by host-specific blocks. In both, priority keys (Hostname, User, Port, IdentityAgent, IdentityFile, IdentitiesOnly, ProxyJump, ProxyCommand) are listed first in that order, with remaining keys sorted alphabetically. If the host uses `ProxyJump`, each hop in the chain gets its own block. `ProxyCommand` is also followed when it takes the canonical `ssh [opts] host -W %h:%p` form; other commands (e.g. SOCKS, cloudflared, SSM) are printed verbatim without recursion.
 
 When stdout is a terminal, output is syntax-highlighted with ANSI colors. Set `NO_COLOR` to disable.
 

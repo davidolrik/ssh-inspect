@@ -127,12 +127,14 @@ func TestRandomHostname(t *testing.T) {
 func TestPrintConfigPriorityOrder(t *testing.T) {
 	cfg := Config{
 		"hostname":       {"myserver.example.com"},
+		"hostkeyalias":   {"myserver-alias"},
 		"user":           {"deploy"},
 		"port":           {"22"},
 		"identityfile":   {"~/.ssh/deploy_key"},
 		"identityagent":  {"none"},
 		"identitiesonly": {"yes"},
 		"proxyjump":      {"bastion"},
+		"proxycommand":   {"ssh bastion -W %h:%p"},
 		"addkeystoagent": {"true"},
 		"controlmaster":  {"auto"},
 	}
@@ -269,6 +271,41 @@ func TestParseJumpHosts(t *testing.T) {
 				t.Errorf("ParseJumpHosts(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
 			}
 		}
+	}
+}
+
+// TestParseProxyCommand verifies extraction of an SSH hop hostname from ProxyCommand values.
+// Only the canonical `ssh ... -W %h:%p` form yields a hostname; other forms (nc, cloudflared,
+// aws ssm, kubectl, etc.) return an empty string since they don't route through an SSH host
+// we can recursively inspect.
+func TestParseProxyCommand(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"host before -W", "ssh bastion -W %h:%p", "bastion"},
+		{"host after -W", "ssh -W %h:%p bastion", "bastion"},
+		{"user@host", "ssh -W %h:%p user@bastion", "bastion"},
+		{"host with port flag", "ssh -p 2222 bastion -W %h:%p", "bastion"},
+		{"absolute ssh path", "/usr/bin/ssh bastion -W %h:%p", "bastion"},
+		{"bare flags are skipped", "ssh -q -A bastion -W %h:%p", "bastion"},
+		{"option flags with values are skipped", "ssh -o StrictHostKeyChecking=no -i ~/.ssh/key bastion -W %h:%p", "bastion"},
+		{"nc SOCKS proxy is not an SSH hop", "nc -x socks.example.com:1080 %h %p", ""},
+		{"corkscrew HTTP proxy is not an SSH hop", "corkscrew proxy.example.com 8080 %h %p", ""},
+		{"cloudflared is not an SSH hop", "cloudflared access ssh --hostname %h", ""},
+		{"aws ssm is not an SSH hop", "aws ssm start-session --target %h", ""},
+		{"ssh without -W is not treated as a hop", "ssh bastion nc %h %p", ""},
+		{"empty value", "", ""},
+		{"none", "none", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseProxyCommand(tt.input)
+			if got != tt.want {
+				t.Errorf("ParseProxyCommand(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
 	}
 }
 
