@@ -377,6 +377,23 @@ func ParseProxyCommand(value string) string {
 	return ""
 }
 
+// markProxyDisabled records in cfg that a host opts out of the proxy set in
+// defaults. `ssh -G` omits ProxyJump and ProxyCommand when they are "none", so
+// without this a host overriding a Host * proxy would look like it inherits it.
+func markProxyDisabled(cfg, effective, defaults Config) {
+	proxyKeys := []string{"proxyjump", "proxycommand"}
+	for _, key := range proxyKeys {
+		if _, ok := effective[key]; ok {
+			return
+		}
+	}
+	for _, key := range proxyKeys {
+		if _, ok := defaults[key]; ok {
+			cfg[key] = []string{"none"}
+		}
+	}
+}
+
 // ResolveChain returns the target host followed by each host in its ProxyJump
 // chain, recursively. visited prevents cycles. The target is always first
 // (closest to the intended destination); proxies follow in hop order.
@@ -393,6 +410,7 @@ func ResolveChain(hostname string, defaults Config, visited map[string]bool, ext
 	}
 
 	cfg := Diff(effective, defaults)
+	markProxyDisabled(cfg, effective, defaults)
 	var entries []HostEntry
 
 	// Follow hops from the effective config rather than the diff: a jump host

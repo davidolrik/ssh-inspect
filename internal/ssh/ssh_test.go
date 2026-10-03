@@ -378,6 +378,10 @@ Host * !localhost
 	if got := entries[0].Config["port"]; !slices.Equal(got, []string{"2222"}) {
 		t.Errorf("expected jump port [2222], got %v", got)
 	}
+	// The jump host opts out of the wildcard ProxyJump, which must be visible.
+	if got := entries[0].Config["proxyjump"]; !slices.Equal(got, []string{"none"}) {
+		t.Errorf("expected jump proxyjump [none], got %v", got)
+	}
 	// The wildcard ProxyJump is reported under Host *, not repeated on the target.
 	if got, ok := entries[1].Config["proxyjump"]; ok {
 		t.Errorf("expected no proxyjump in target diff, got %v", got)
