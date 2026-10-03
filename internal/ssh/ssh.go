@@ -380,13 +380,14 @@ func ParseProxyCommand(value string) string {
 // ResolveChain returns the target host followed by each host in its ProxyJump
 // chain, recursively. visited prevents cycles. The target is always first
 // (closest to the intended destination); proxies follow in hop order.
-func ResolveChain(hostname string, defaults Config, visited map[string]bool) ([]HostEntry, error) {
+// extraArgs are passed through to every `ssh -G` invocation.
+func ResolveChain(hostname string, defaults Config, visited map[string]bool, extraArgs ...string) ([]HostEntry, error) {
 	if visited[hostname] {
 		return nil, nil
 	}
 	visited[hostname] = true
 
-	effective, err := RunG(hostname)
+	effective, err := RunG(hostname, extraArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -394,17 +395,19 @@ func ResolveChain(hostname string, defaults Config, visited map[string]bool) ([]
 	cfg := Diff(effective, defaults)
 	var entries []HostEntry
 
-	if jumpVals, ok := cfg["proxyjump"]; ok && len(jumpVals) > 0 {
+	// Follow hops from the effective config rather than the diff: a jump host
+	// set in a Host * block equals the baseline and is absent from cfg.
+	if jumpVals, ok := effective["proxyjump"]; ok && len(jumpVals) > 0 {
 		for _, jumpHost := range ParseJumpHosts(jumpVals[0]) {
-			chain, err := ResolveChain(jumpHost, defaults, visited)
+			chain, err := ResolveChain(jumpHost, defaults, visited, extraArgs...)
 			if err != nil {
 				return nil, err
 			}
 			entries = append(entries, chain...)
 		}
-	} else if cmdVals, ok := cfg["proxycommand"]; ok && len(cmdVals) > 0 {
+	} else if cmdVals, ok := effective["proxycommand"]; ok && len(cmdVals) > 0 {
 		if proxyHost := ParseProxyCommand(cmdVals[0]); proxyHost != "" {
-			chain, err := ResolveChain(proxyHost, defaults, visited)
+			chain, err := ResolveChain(proxyHost, defaults, visited, extraArgs...)
 			if err != nil {
 				return nil, err
 			}

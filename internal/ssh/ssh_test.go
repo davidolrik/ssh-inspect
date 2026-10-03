@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -330,6 +331,56 @@ func TestResolveChain(t *testing.T) {
 	// Target host is always last; proxies (if any) precede it.
 	if last := entries[len(entries)-1]; last.Name != "localhost" {
 		t.Errorf("expected last entry to be 'localhost', got %q", last.Name)
+	}
+}
+
+// TestResolveChainWildcardProxyJump verifies that a jump host set only in a
+// Host * block is followed, even though it is identical to the baseline and
+// therefore absent from the host-specific diff.
+func TestResolveChainWildcardProxyJump(t *testing.T) {
+	if _, err := exec.LookPath("ssh"); err != nil {
+		t.Skip("ssh not found in PATH")
+	}
+
+	configPath := filepath.Join(t.TempDir(), "config")
+	config := `Host jump
+    HostName 192.0.2.10
+    Port 2222
+    ProxyJump none
+
+Host * !localhost
+    ProxyJump jump
+`
+	if err := os.WriteFile(configPath, []byte(config), 0600); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	defaults, err := RunG(RandomHostname(), "-F", configPath)
+	if err != nil {
+		t.Fatalf("failed to get defaults: %v", err)
+	}
+
+	entries, err := ResolveChain("target.example.com", defaults, make(map[string]bool), "-F", configPath)
+	if err != nil {
+		t.Fatalf("ResolveChain error: %v", err)
+	}
+
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name)
+	}
+	want := []string{"jump", "target.example.com"}
+	if !slices.Equal(names, want) {
+		t.Fatalf("expected chain %v, got %v", want, names)
+	}
+
+	// The jump host block carries its own settings.
+	if got := entries[0].Config["port"]; !slices.Equal(got, []string{"2222"}) {
+		t.Errorf("expected jump port [2222], got %v", got)
+	}
+	// The wildcard ProxyJump is reported under Host *, not repeated on the target.
+	if got, ok := entries[1].Config["proxyjump"]; ok {
+		t.Errorf("expected no proxyjump in target diff, got %v", got)
 	}
 }
 
