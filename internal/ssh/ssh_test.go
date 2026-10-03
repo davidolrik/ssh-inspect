@@ -310,6 +310,28 @@ func TestParseProxyCommand(t *testing.T) {
 	}
 }
 
+// TestTitleCaseKey tests canonical casing of known keys and the fallback for unknown ones.
+func TestTitleCaseKey(t *testing.T) {
+	tests := []struct {
+		key  string
+		want string
+	}{
+		{"hostname", "Hostname"},
+		{"hostkeyalias", "HostKeyAlias"},
+		{"proxyjump", "ProxyJump"},
+		{"unknownoption", "Unknownoption"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			if got := TitleCaseKey(tt.key); got != tt.want {
+				t.Errorf("TitleCaseKey(%q) = %q, want %q", tt.key, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestResolveChain is an integration test that verifies chain resolution for localhost.
 func TestResolveChain(t *testing.T) {
 	if _, err := exec.LookPath("ssh"); err != nil {

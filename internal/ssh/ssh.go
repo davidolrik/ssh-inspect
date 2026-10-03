@@ -467,6 +467,7 @@ var titleCaseOverrides = map[string]string{
 	"casignaturealgorithms":            "CASignatureAlgorithms",
 	"hostbasedacceptedalgorithms":      "HostbasedAcceptedAlgorithms",
 	"hostkeyalgorithms":                "HostKeyAlgorithms",
+	"hostkeyalias":                     "HostKeyAlias",
 	"kexalgorithms":                    "KexAlgorithms",
 	"macs":                             "MACs",
 	"pubkeyacceptedalgorithms":         "PubkeyAcceptedAlgorithms",
