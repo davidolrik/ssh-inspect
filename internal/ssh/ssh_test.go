@@ -335,8 +335,8 @@ func TestResolveChain(t *testing.T) {
 }
 
 // TestResolveChainWildcardProxyJump verifies that a jump host set only in a
-// Host * block is followed, even though it is identical to the baseline and
-// therefore absent from the host-specific diff.
+// Host * block is followed and shown on each host, even though it is identical
+// to the baseline.
 func TestResolveChainWildcardProxyJump(t *testing.T) {
 	if _, err := exec.LookPath("ssh"); err != nil {
 		t.Skip("ssh not found in PATH")
@@ -382,9 +382,9 @@ Host * !localhost
 	if got := entries[0].Config["proxyjump"]; !slices.Equal(got, []string{"none"}) {
 		t.Errorf("expected jump proxyjump [none], got %v", got)
 	}
-	// The wildcard ProxyJump is reported under Host *, not repeated on the target.
-	if got, ok := entries[1].Config["proxyjump"]; ok {
-		t.Errorf("expected no proxyjump in target diff, got %v", got)
+	// The target states its jump host even though it is inherited from Host *.
+	if got := entries[1].Config["proxyjump"]; !slices.Equal(got, []string{"jump"}) {
+		t.Errorf("expected target proxyjump [jump], got %v", got)
 	}
 }
 

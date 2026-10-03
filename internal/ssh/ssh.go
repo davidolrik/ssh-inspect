@@ -377,15 +377,22 @@ func ParseProxyCommand(value string) string {
 	return ""
 }
 
-// markProxyDisabled records in cfg that a host opts out of the proxy set in
-// defaults. `ssh -G` omits ProxyJump and ProxyCommand when they are "none", so
-// without this a host overriding a Host * proxy would look like it inherits it.
-func markProxyDisabled(cfg, effective, defaults Config) {
+// markProxy makes a host's proxy explicit in cfg, so each entry in a chain
+// states how it is reached. A proxy inherited from Host * equals the one in
+// defaults and is absent from the diff, so it is copied from effective.
+// `ssh -G` omits ProxyJump and ProxyCommand when they are "none", so a host
+// opting out of the proxy set in defaults is recorded as "none".
+func markProxy(cfg, effective, defaults Config) {
 	proxyKeys := []string{"proxyjump", "proxycommand"}
+	hasProxy := false
 	for _, key := range proxyKeys {
-		if _, ok := effective[key]; ok {
-			return
+		if vals, ok := effective[key]; ok {
+			cfg[key] = vals
+			hasProxy = true
 		}
+	}
+	if hasProxy {
+		return
 	}
 	for _, key := range proxyKeys {
 		if _, ok := defaults[key]; ok {
@@ -410,11 +417,11 @@ func ResolveChain(hostname string, defaults Config, visited map[string]bool, ext
 	}
 
 	cfg := Diff(effective, defaults)
-	markProxyDisabled(cfg, effective, defaults)
+	markProxy(cfg, effective, defaults)
 	var entries []HostEntry
 
 	// Follow hops from the effective config rather than the diff: a jump host
-	// set in a Host * block equals the baseline and is absent from cfg.
+	// set in a Host * block equals the baseline and is absent from the diff.
 	if jumpVals, ok := effective["proxyjump"]; ok && len(jumpVals) > 0 {
 		for _, jumpHost := range ParseJumpHosts(jumpVals[0]) {
 			chain, err := ResolveChain(jumpHost, defaults, visited, extraArgs...)
